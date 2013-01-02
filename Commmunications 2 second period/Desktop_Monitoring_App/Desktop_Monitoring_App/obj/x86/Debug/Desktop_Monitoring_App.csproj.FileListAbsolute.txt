@@ -1,0 +1,11 @@
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\bin\Debug\Desktop_Monitoring_App.exe
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\bin\Debug\Desktop_Monitoring_App.pdb
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\ResolveAssemblyReference.cache
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\Desktop_Monitoring_App.Form1.resources
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\Desktop_Monitoring_App.Properties.Resources.resources
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\GenerateResource.read.1.tlog
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\GenerateResource.write.1.tlog
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\Desktop_Monitoring_App.exe
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\obj\x86\Debug\Desktop_Monitoring_App.pdb
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\bin\Debug\Images\connected.png
+D:\Documents\Individual_Project\4 Tecnical Implementation\Desktop Monitoring Application\Desktop_Monitoring_App\Desktop_Monitoring_App\bin\Debug\Images\not_connected.png

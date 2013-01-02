@@ -1,0 +1,395 @@
+/////////////////////////////////////////////////////////////////
+// Thomas J. Smith
+// tjs1g10@ecs.soton.ac.uk
+//
+// 2012-11-07 Sensor Fusion Main.nxc
+//
+// Part III Individual Project
+// Sensor Fusion for Multi Robot Systems
+// Electronics and Computer Science
+// University of Southampton
+//
+// Uses sensor fusion to interpret sensor data,
+// which is relayed to all robots via XBee wireless
+// communications. This then controls the formation
+// of the robots as they partol to find the light/sound source
+//
+// References:
+// http://www.mastincrosbie.com/Marks_LEGO_projects/LEGO_Street_View_Car_files/lsvc.nxc
+//
+/////////////////////////////////////////////////////////////////
+
+
+#define SOUND S1
+#define COMPASS S2
+#define LIGHT S3
+#define NXTBEE S4
+
+#define MOTOR1 OUT_A
+#define MOTOR2 OUT_C
+
+#define BAUD HS_BAUD_115200
+#define PORTSETTINGS HS_MODE_8N1
+
+#define R1TAG 0x77
+#define R2TAG 0x46
+#define R3TAG 0x5c
+#define PCTAG 0xff
+
+//Define Robot Address (1, 2 or 3)
+//byte ROBOT_TAG = 0x77;          //1
+byte ROBOT_TAG = 0x46;          //2
+//byte ROBOT_TAG = 0x5c;          //3
+
+/////////////////////////////////////////////////////////////////
+// Globals
+/////////////////////////////////////////////////////////////////
+int Heading = 0;
+int Light = 0;
+int Sound = 0;
+int TachA = 0;                 //Local To Robot
+int TachC = 0;
+bool Send = false;
+mutex fileMutex;
+
+unsigned long TimeLastSend = 0;
+unsigned long TimeNow = 0;
+
+int R1X = 0;                   //Robot 1 State
+int R1Y = 0;
+int R1L = 0;
+int R1S = 0;
+
+
+int R2X = 0;                   //Robot 2 State
+int R2Y = 0;
+int R2L = 0;
+int R2S = 0;
+
+int R3X = 0;                   //Robot 3 State
+int R3Y = 0;
+int R3L = 0;
+int R3S = 0;
+
+
+
+
+/////////////////////////////////////////////////////////////////
+// Telemetry data structure for XBee transmission
+/////////////////////////////////////////////////////////////////
+struct packet {
+  byte Tag;
+  int sound;
+	int longitude;
+	int latitude;
+  int light;
+};
+
+/////////////////////////////////////////////////////////////////
+// Utility Functions
+/////////////////////////////////////////////////////////////////
+// Output program introduction text to NXT screen
+void IntroMessage()
+{
+     ClearScreen();
+     TextOut(0, LCD_LINE1, "Sensor Fusion Main.nxc");
+     TextOut(0, LCD_LINE2, "S1: SOUND");
+     TextOut(0, LCD_LINE3, "S2: COMPASS");
+     TextOut(0, LCD_LINE4, "S3: LIGHT");
+     TextOut(0, LCD_LINE5, "S4: NXTBEE");
+     TextOut(0, LCD_LINE6, "tjs1g10");
+     
+     switch(ROBOT_TAG)
+     {
+          case 0x77:
+          TextOut(0, LCD_LINE7, "ROBOT 1");
+          PlayTone(400, 100);
+          break;
+          
+          case 0x46:
+          TextOut(0, LCD_LINE7, "ROBOT 2");
+          PlayTone(700, 100);
+          break;
+          
+          case 0x5c:
+          TextOut(0, LCD_LINE7, "ROBOT 3");
+          PlayTone(1000, 100);
+          break;
+     }
+     
+}
+
+//Wait for data to be sent
+inline void WaitForSend()
+{
+       while(RS485SendingData())
+         Wait(MS_1);
+}
+
+//Setup Sensors and NXTBee
+void Initialise()
+{
+     // Setup COMPASS
+     SetSensorType(COMPASS, SENSOR_TYPE_LOWSPEED);
+     SetSensorMode(COMPASS, SENSOR_MODE_ROTATION);
+     ResetSensor(COMPASS);
+     //Setup SOUND
+     SetSensorSound(SOUND);
+     //Setup LIGHT
+     SetSensorColorNone(LIGHT);
+     //Setup NXTBEE
+     UseRS485();                    //Configure S4 for RS485 high speed comms
+     RS485Enable();                 //Enable the RS485 System
+     SetHSDataMode(DATA_MODE_RAW);
+     RS485Uart(BAUD, PORTSETTINGS); //Initialise UART
+     Wait(MS_1);
+     //Setup Tachometers
+     SendRS485String(ROBOT_TAG);
+     WaitForSend();
+     ResetRotationCount(MOTOR1);
+     ResetRotationCount(MOTOR2);
+}
+
+//Gets and updates all sensor and reading values
+void GetSensorValues()
+{
+     Heading = SensorHTCompass(COMPASS);
+     Light = SensorRaw(LIGHT);
+     Sound =  Sensor(SOUND);
+     TachA =  MotorRotationCount(MOTOR1);
+     TachC = MotorRotationCount(MOTOR2);
+}
+
+void ShowSensorValues()
+{
+     ClearScreen();
+     TextOut(0, LCD_LINE1, "Key Data");
+     TextOut(0, LCD_LINE2, FormatNum("RH: %d", Heading));
+     TextOut(0, LCD_LINE3, FormatNum("RS: %d", Sound));
+     TextOut(0, LCD_LINE4, FormatNum("RL: %d", Light));
+     switch(ROBOT_TAG)
+     {
+          case 0x77:
+          TextOut(0, LCD_LINE7, "ROBOT 1");
+          PlayTone(400, 100);
+          break;
+
+          case 0x46:
+          TextOut(0, LCD_LINE7, "ROBOT 2");
+          PlayTone(700, 100);
+          break;
+
+          case 0x5c:
+          TextOut(0, LCD_LINE7, "ROBOT 3");
+          PlayTone(1000, 100);
+          break;
+     }
+}
+
+//Sends the struct variables via uart as requested
+void SendTelemetry()
+{
+     Acquire(fileMutex);
+     GetSensorValues();
+     Release(fileMutex);
+     ShowSensorValues();
+     packet p;
+     string msg;
+
+     p.Tag = ROBOT_TAG;
+     p.longitude = TachA;
+     p.latitude = TachC;
+     p.light = Light;
+     p.sound = Sound;
+
+     msg = FlattenVar(p);
+     SendRS485String(msg);
+     WaitForSend();
+     TimeLastSend = CurrentTick();
+}
+
+void SaveRobotData(byte Buff[], int Loc)
+{
+     string S = SubStr(Buff, 1, 2);
+     string X = SubStr(Buff, 3, 2);
+     string Y = SubStr(Buff, 5, 2);
+     string L = SubStr(Buff, 7, 2);
+     
+     switch(Loc)
+     {
+         case 1:
+             UnflattenVar(S, R1S);
+             UnflattenVar(X, R1X);
+             UnflattenVar(Y, R1Y);
+             UnflattenVar(L, R1L);
+             break;
+             
+         case 2:
+             UnflattenVar(S, R2S);
+             UnflattenVar(X, R2X);
+             UnflattenVar(Y, R2Y);
+             UnflattenVar(L, R2L);
+             break;
+             
+         case 3:
+             UnflattenVar(S, R3S);
+             UnflattenVar(X, R3X);
+             UnflattenVar(Y, R3Y);
+             UnflattenVar(L, R3L);
+             break;
+             
+         default:
+             PlayTone(700, 1);
+             break;
+     }
+}
+
+void EmptyArray(byte Array[])
+{
+     for(int i = 0; i < SizeOf(Array); i++)
+     {
+          Array[i] = 0;
+     }
+}
+
+/////////////////////////////////////////////////////////////////
+// Tasks
+/////////////////////////////////////////////////////////////////
+task Sensors()
+{
+    while(1)
+    {
+        until(RS485DataAvailable() >= 9)
+        {
+            //If in send mode and more than 5 seconds elapses between
+            //Data being sent or received then
+            /*if(Send == true)
+            {
+                TimeNow = CurrentTick();
+                if(((TimeNow - TimeLastSend) > 5000)&&(ROBOT_TAG == R1TAG))
+                {
+                    SendTelemetry();
+                }
+             }    */
+        }
+        byte Buffer[];
+        
+        RS485Read(Buffer);
+
+        switch(Buffer[0])
+        {
+             case PCTAG:
+             ClearScreen();
+             //Logging Start/Stop Signal
+                 Send = !Send;
+
+                 if((Send == true)&&(ROBOT_TAG == R1TAG))
+                 {
+                     SendTelemetry();
+                 }
+                 break;
+                 
+             case R1TAG:
+             Wait(SEC_2);
+                 if(Send)
+                 {
+                     switch(ROBOT_TAG)
+                     {
+                         case R1TAG:
+                         //R1 receives R1 -> Do Nothing
+                              break;
+
+                         case R2TAG:
+                         //R2 receives R1 -> Save then Send
+                             SaveRobotData(Buffer, 1);
+                             SendTelemetry();
+                             break;
+                             
+                         case R3TAG:
+                         //R3 receives R1 -> Just Save
+                             SaveRobotData(Buffer, 1);
+                             break;
+                     }//End Robot_Tag Switch
+                 }
+                 break;
+                 
+
+             case R2TAG:
+             Wait(SEC_2);
+                 if(Send)
+                 {
+                     switch(ROBOT_TAG)
+                     {
+                         case R1TAG:
+                         //R1 receives R2 -> Just Save
+                             SaveRobotData(Buffer, 2);
+                             /*ClearScreen();
+                             TextOut(0, LCD_LINE1, "Robot 2 Stored");
+                             TextOut(0, LCD_LINE2, FormatNum("R2X: %d", R2X));
+                             TextOut(0, LCD_LINE3, FormatNum("R2S: %d", R2S));
+                             TextOut(0, LCD_LINE4, FormatNum("R2L: %d", R2L));*/
+                             break;
+                             
+                         case R2TAG:
+                         //R2 receives R2 -> Do Nothing
+                             break;
+                             
+                         case R3TAG:
+                         //R3 receives R2 -> Save then Send
+                             SaveRobotData(Buffer, 2);
+                             SendTelemetry();
+                             break;
+                     }//End Robot_Tag Switch
+                 }
+                 break;
+                 
+             case R3TAG:
+             Wait(SEC_2);
+                 if(Send)
+                 {
+                     switch(ROBOT_TAG)
+                     {
+                         case R1TAG:
+                         //R1 receives R3 -> Save Then Send
+                             SaveRobotData(Buffer, 3);
+                             SendTelemetry();
+                             /*ClearScreen();
+                             TextOut(0, LCD_LINE1, "Robot 3 Stored");
+                             TextOut(0, LCD_LINE2, FormatNum("R3X: %d", R3X));
+                             TextOut(0, LCD_LINE3, FormatNum("R3S: %d", R3S));
+                             TextOut(0, LCD_LINE4, FormatNum("R3L: %d", R3L));*/
+                             break;
+                         case R2TAG:
+                         //R2 receives R3 -> Just Save
+                             SaveRobotData(Buffer, 3);
+                             break;
+                         case R3TAG:
+                         //R3 receives R2 -> Do Nothing
+                             break;
+                     }//End Robot_Tag Switch
+                 }
+                 break;
+
+             default:
+             //Unrecognised instruction received
+             //Could error check?
+                 PlayTone(700, 1);
+                 break;
+        }//End Switch Buffer
+        
+       // EmptyArray(Buffer);
+        
+    }//End While Loop
+}//End Sensor Task
+
+task Motors()
+{
+
+}
+
+task main()
+{
+     Precedes(Sensors, Motors);
+     IntroMessage();
+     Initialise();
+}
